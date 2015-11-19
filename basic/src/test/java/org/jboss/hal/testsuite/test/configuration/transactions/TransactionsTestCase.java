@@ -108,7 +108,6 @@ public class TransactionsTestCase extends TransactionsTestCaseAbstract {
         String socketBinding = operations.createSocketBinding();
         page.getConfig().switchTo("Recovery");
         editTextAndVerify(address, SOCKET_BINDING, SOCKET_BINDING_ATTR, socketBinding);
-        operations.removeSocketBinding(socketBinding);
     }
 
     @Test
@@ -116,7 +115,6 @@ public class TransactionsTestCase extends TransactionsTestCaseAbstract {
         String socketBinding = operations.createSocketBinding();
         page.getConfig().switchTo("Recovery");
         editTextAndVerify(address, STATUS_SOCKET_BINDING, STATUS_SOCKET_BINDING_ATTR, socketBinding);
-        operations.removeSocketBinding(socketBinding);
     }
 
     @Test

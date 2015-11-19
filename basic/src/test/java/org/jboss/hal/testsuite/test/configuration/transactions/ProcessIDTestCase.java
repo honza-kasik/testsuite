@@ -51,11 +51,6 @@ public class ProcessIDTestCase extends TransactionsTestCaseAbstract {
         page.getConfig().switchTo("Process ID");
     }
 
-    @AfterClass
-    public static void tearDown() {
-        operations.removeSocketBinding(socketBinding);
-    }
-
     @Test
     public void setProcessIDUUIDToTrue() throws IOException, InterruptedException {
         editAndVerifyUUIDAndSocketBinding(true, "");

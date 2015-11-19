@@ -60,7 +60,6 @@ public abstract class UndertowTestCaseAbstract {
     public static void mainTearDown() {
         operations.removeWorker(WORKER_VALUE_VALID);
         operations.removeBufferPool(BUFFER_POOL_VALUE_VALID);
-        operations.removeSocketBinding(SOCKET_BINDING_VALUE_VALID);
         dispatcher.close();
     }
 

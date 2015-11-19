@@ -466,6 +466,7 @@ public class HTTPSListenerTestCase extends UndertowTestCaseAbstract {
         verifier.verifyResource(address, true);
         verifier.verifyAttribute(address, SOCKET_BINDING, socketBinding);
         verifier.verifyAttribute(address, SECURITY_REALM, SECURITY_REALM_VALUE);
+        operations.removeHTTPSListener(httpServer, name);
         operations.removeSocketBinding(socketBinding);
     }
 
