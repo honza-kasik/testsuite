@@ -21,7 +21,7 @@ import java.util.concurrent.TimeoutException;
 @Category(Shared.class)
 public class ACLTestCase extends SecurityTestCaseAbstract {
 
-    private static final Address ACL_ADDRESS = JBOSS_WEB_ADDRESS.and("acl","classic");
+    private static final Address ACL_ADDRESS = JBOSS_WEB_ADDRESS.and("acl", "classic");
     private static final String ACL_MODULE_NAME = "acl-module_" + RandomStringUtils.randomAlphanumeric(5);
     private static final String ACL_MODULE_TBA_NAME = "acl-module-TBA_" + RandomStringUtils.randomAlphanumeric(5);
     private static final Address ACL_MODULE_ADDRESS = ACL_ADDRESS.and("acl-module", ACL_MODULE_NAME);
