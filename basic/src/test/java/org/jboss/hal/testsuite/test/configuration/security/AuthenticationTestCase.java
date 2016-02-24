@@ -3,88 +3,81 @@ package org.jboss.hal.testsuite.test.configuration.security;
 import org.apache.commons.lang.RandomStringUtils;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.hal.testsuite.category.Shared;
-import org.jboss.hal.testsuite.dmr.AddressTemplate;
-import org.jboss.hal.testsuite.dmr.Operation;
-import org.jboss.hal.testsuite.dmr.ResourceAddress;
+import org.jboss.hal.testsuite.creaper.ResourceVerifier;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
+import org.wildfly.extras.creaper.core.online.operations.Address;
+import org.wildfly.extras.creaper.core.online.operations.OperationException;
+import org.wildfly.extras.creaper.core.online.operations.Values;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
-/**
- * @author Jan Kasik <jkasik@redhat.com>
- *         Created on 16.10.15.
- */
 @RunWith(Arquillian.class)
 @Category(Shared.class)
 public class AuthenticationTestCase extends SecurityTestCaseAbstract {
 
-    private static final AddressTemplate AUTHENTICATION_TEMPLATE = SECURITY_DOMAIN_TEMPLATE.append("authentication=classic/login-module=*");
-    private static final String JBOSS_EJB_POLICY =  "jboss-ejb-policy";
-    private static ResourceAddress AUTHENTICATION_ADDRESS;
-    private static String loginModule;
+    private static final Address AUTHENTICATION_ADDRESS = JBOSS_EJB_ADDRESS.and("authentication", "classic");
+    private static final String LOGIN_MODULE_NAME = "lm_" + RandomStringUtils.randomAlphanumeric(6);
+    private static final String LOGIN_MODULE_TBA_NAME = "lm-TBA_" + RandomStringUtils.randomAlphanumeric(6);
+    private static Address LOGIN_MODULE_ADDRESS = AUTHENTICATION_ADDRESS.and("login-module", LOGIN_MODULE_NAME);
+    private static Address LOGIN_MODULE_TBA_ADDRESS = AUTHENTICATION_ADDRESS.and("login-module", LOGIN_MODULE_TBA_NAME);
 
     @BeforeClass
-    public static void setUp() {
-        loginModule = addLoginModule();
-        AUTHENTICATION_ADDRESS = AUTHENTICATION_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, loginModule);
+    public static void setUp() throws IOException, TimeoutException, InterruptedException {
+        operations.add(AUTHENTICATION_ADDRESS);
+        operations.add(LOGIN_MODULE_ADDRESS,
+                Values.of("code", RandomStringUtils.randomAlphanumeric(8)).and("flag", "optional"));
+        administration.reloadIfRequired();
+    }
+
+    @AfterClass
+    public static void afterClass() throws IOException, OperationException, TimeoutException, InterruptedException {
+        operations.removeIfExists(LOGIN_MODULE_ADDRESS);
+        operations.removeIfExists(LOGIN_MODULE_TBA_ADDRESS);
+        operations.removeIfExists(AUTHENTICATION_ADDRESS);
+        administration.reloadIfRequired();
     }
 
     @Before
     public void before() {
         page.viewJBossEJBPolicy();
         page.switchToAuthentication();
-        page.selectModule(loginModule);
+        page.selectModule(LOGIN_MODULE_NAME);
     }
 
     @Test
-    public void addLoginModuleInGUI() {
-        String name = "lm_" + RandomStringUtils.randomAlphanumeric(6);
-        String code = "code_" + RandomStringUtils.randomAlphanumeric(6) + "-" + name;
-        page.addAuthenticationModule(name, code);
-        Assert.assertTrue("Login module should be present in table", page.getConfigFragment().resourceIsPresent(name));
-        verifier.verifyResource(AUTHENTICATION_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, name));
+    public void addLoginModuleInGUI() throws Exception {
+        String code = "code_" + RandomStringUtils.randomAlphanumeric(6) + "-" + LOGIN_MODULE_TBA_NAME;
+        page.addAuthenticationModule(LOGIN_MODULE_TBA_NAME, code);
+        Assert.assertTrue("Login module should be present in table", page.getConfigFragment()
+                .resourceIsPresent(LOGIN_MODULE_TBA_NAME));
+        new ResourceVerifier(LOGIN_MODULE_TBA_ADDRESS, client).verifyExists();
     }
 
     @Test
-    public void editCode() throws IOException, InterruptedException {
-        editTextAndVerify(AUTHENTICATION_ADDRESS, CODE, CODE_ATTR);
+    public void editCode() throws Exception {
+        editTextAndVerify(LOGIN_MODULE_ADDRESS, CODE, CODE_ATTR);
     }
 
 
     @Test
-    public void editModule() throws IOException, InterruptedException {
-        editTextAndVerify(AUTHENTICATION_ADDRESS, MODULE, MODULE_ATTR);
+    public void editModule() throws Exception {
+        editTextAndVerify(LOGIN_MODULE_ADDRESS, MODULE, MODULE_ATTR);
     }
 
     @Test
-    public void editModuleOptions() throws IOException, InterruptedException {
-        editModuleOptionsAndVerify(AUTHENTICATION_ADDRESS, MODULE_OPTIONS, MODULE_OPTIONS_ATTR, MODULE_OPTIONS_VALUE);
+    public void editModuleOptions() throws Exception {
+        editModuleOptionsAndVerify(LOGIN_MODULE_ADDRESS, MODULE_OPTIONS, MODULE_OPTIONS_ATTR, MODULE_OPTIONS_VALUE);
     }
 
     @Test
-    public void selectFlag() throws IOException, InterruptedException {
-        selectOptionAndVerify(AUTHENTICATION_ADDRESS, FLAG, FLAG_ATTR, FLAG_VALUE);
+    public void selectFlag() throws Exception {
+        selectOptionAndVerify(LOGIN_MODULE_ADDRESS, FLAG, FLAG_ATTR, FLAG_VALUE);
     }
-
-    private static String addLoginModule() {
-        addAuthentication();
-        String name = "lm_" + RandomStringUtils.randomAlphanumeric(6);
-        dispatcher.execute(new Operation.Builder("add", AUTHENTICATION_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, name))
-                .param("code", RandomStringUtils.randomAlphanumeric(8))
-                .param("flag", "optional")
-                .build());
-        reloadIfRequiredAndWaitForRunning();
-        return name;
-    }
-
-    private static void addAuthentication() {
-        dispatcher.execute(new Operation.Builder("add", SECURITY_DOMAIN_TEMPLATE.append("authentication=*").resolve(context, JBOSS_EJB_POLICY, "classic"))
-                .build());
-    }
-
 }

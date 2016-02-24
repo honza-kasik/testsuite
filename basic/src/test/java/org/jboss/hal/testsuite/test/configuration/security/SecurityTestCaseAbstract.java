@@ -3,31 +3,23 @@ package org.jboss.hal.testsuite.test.configuration.security;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.jboss.arquillian.drone.api.annotation.Drone;
 import org.jboss.arquillian.graphene.page.Page;
-import org.jboss.hal.testsuite.cli.CliClientFactory;
-import org.jboss.hal.testsuite.cli.DomainManager;
-import org.jboss.hal.testsuite.dmr.AddressTemplate;
-import org.jboss.hal.testsuite.dmr.DefaultContext;
-import org.jboss.hal.testsuite.dmr.Dispatcher;
-import org.jboss.hal.testsuite.dmr.ResourceAddress;
-import org.jboss.hal.testsuite.dmr.ResourceVerifier;
-import org.jboss.hal.testsuite.dmr.StatementContext;
+import org.jboss.dmr.ModelNode;
+import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
+import org.jboss.hal.testsuite.creaper.ResourceVerifier;
 import org.jboss.hal.testsuite.fragment.ConfigFragment;
 import org.jboss.hal.testsuite.page.config.SecurityPage;
-import org.jboss.hal.testsuite.util.ConfigUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.openqa.selenium.WebDriver;
+import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
+import org.wildfly.extras.creaper.core.online.operations.Address;
+import org.wildfly.extras.creaper.core.online.operations.Operations;
+import org.wildfly.extras.creaper.core.online.operations.admin.Administration;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 
-/**
- * @author Jan Kasik <jkasik@redhat.com>
- *         Created on 16.10.15.
- */
 public abstract class SecurityTestCaseAbstract {
 
     @Page
@@ -49,21 +41,24 @@ public abstract class SecurityTestCaseAbstract {
     protected final String FLAG_VALUE = "optional";
     protected final String[] MODULE_OPTIONS_VALUE = new String[]{"example=value", "test=example"};
 
-    protected static Dispatcher dispatcher;
-    protected static StatementContext context;
-    protected static ResourceVerifier verifier;
+    protected static OnlineManagementClient client;
+    protected static Administration administration;
+    protected static Operations operations;
 
     protected static final String JBOSS_EJB_POLICY =  "jboss-ejb-policy";
     protected static final String JBOSS_WEB_POLICY =  "jboss-web-policy";
-    protected static final String OTHER = "other";
+    protected static final String OTHER_POLICY = "other";
 
-    protected static final AddressTemplate SECURITY_DOMAIN_TEMPLATE = AddressTemplate.of("{default.profile}/subsystem=security/security-domain=*/");
+    protected static final Address JBOSS_EJB_ADDRESS = Address.subsystem("security").and("security-domain", JBOSS_EJB_POLICY);
+    protected static final Address JBOSS_WEB_ADDRESS = Address.subsystem("security").and("security-domain", JBOSS_WEB_POLICY);
+    protected static final Address OTHER_ADDRESS = Address.subsystem("security").and("security-domain", OTHER_POLICY);
+
 
     @BeforeClass
     public static void mainSetUp() {
-        dispatcher = new Dispatcher();
-        context = new DefaultContext();
-        verifier = new ResourceVerifier(dispatcher);
+        client = ManagementClientProvider.createOnlineManagementClient();
+        administration = new Administration(client);
+        operations = new Operations(client);
     }
 
     @Before
@@ -72,56 +67,41 @@ public abstract class SecurityTestCaseAbstract {
     }
 
     @AfterClass
-    public static void tearDown() {
-        dispatcher.close();
+    public static void tearDown_() throws IOException {
+        client.close();
     }
 
-    protected void editModuleOptionsAndVerify(ResourceAddress address, String identifier, String attributeName, String[] values) throws IOException, InterruptedException {
+    protected void editModuleOptionsAndVerify(Address address, String identifier, String attributeName, String[] values) throws Exception {
         page.editTextAndSave(identifier, String.join("\n", values));
-        List<String> properties = new LinkedList<>();
-        for (String value : values) {
-            String[] splitted = value.split("=");
-            List<String> pair = new LinkedList<>();
-            for (String s : splitted) {
-                pair.add("\"" + s + "\"");
-            }
-            properties.add("(" + String.join(" => ", pair) + ")");
+        ModelNode response = new ModelNode();
+        for (int i = 0; i < values.length; i++) {
+            String[] pair = values[i].split("=");
+            response.get(pair[0]).set(pair[1]);
         }
-        String inner = String.join(",", properties);
-        String response = (ConfigUtils.isDomain()) ? "[" + inner + "]" : "{" + inner + "}" ;
-        reloadIfRequiredAndWaitForRunning();
-        verifier.verifyAttribute(address, attributeName, response);
+        administration.reloadIfRequired();
+        new ResourceVerifier(address, client).verifyAttribute(attributeName, response.asObject());
     }
 
-    protected void editTextAndVerify(ResourceAddress address, String identifier, String attributeName, String value) throws IOException, InterruptedException {
+    protected void editTextAndVerify(Address address, String identifier, String attributeName, String value) throws Exception {
         page.editTextAndSave(identifier, value);
-        reloadIfRequiredAndWaitForRunning();
-        verifier.verifyAttribute(address, attributeName, value);
+        administration.reloadIfRequired();
+        new ResourceVerifier(address, client).verifyAttribute(attributeName, value);
     }
 
-    protected void editTextAndVerify(ResourceAddress address, String identifier, String attributeName) throws IOException, InterruptedException {
+    protected void editTextAndVerify(Address address, String identifier, String attributeName) throws Exception {
         editTextAndVerify(address, identifier, attributeName, "sec_" + attributeName + RandomStringUtils.randomAlphabetic(4));
     }
 
-    protected void editCheckboxAndVerify(ResourceAddress address, String identifier, String attributeName, Boolean value) throws IOException, InterruptedException {
+    protected void editCheckboxAndVerify(Address address, String identifier, String attributeName, Boolean value) throws Exception {
         page.editCheckboxAndSave(identifier, value);
-        reloadIfRequiredAndWaitForRunning();
-        verifier.verifyAttribute(address, attributeName, value.toString());
+        administration.reloadIfRequired();
+        new ResourceVerifier(address, client).verifyAttribute(attributeName, value);
     }
 
-    public void selectOptionAndVerify(ResourceAddress address, String identifier, String attributeName, String value) throws IOException, InterruptedException {
+    public void selectOptionAndVerify(Address address, String identifier, String attributeName, String value) throws Exception {
         page.selectOptionAndSave(identifier, value);
-        reloadIfRequiredAndWaitForRunning();
-        verifier.verifyAttribute(address, attributeName, value);
-    }
-
-    protected static void reloadIfRequiredAndWaitForRunning() {
-        final int timeout = 60000;
-        if (ConfigUtils.isDomain()) {
-            new DomainManager(CliClientFactory.getClient()).reloadIfRequiredAndWaitUntilRunning(timeout);
-        } else {
-            CliClientFactory.getClient().reload();
-        }
+        administration.reloadIfRequired();
+        new ResourceVerifier(address, client).verifyAttribute(attributeName, value);
     }
 
     protected void verifyIfErrorAppears(String identifier, String value) {

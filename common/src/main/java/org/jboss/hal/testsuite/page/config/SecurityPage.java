@@ -37,6 +37,7 @@ public class SecurityPage extends ConfigurationPage implements Navigatable {
         navigation.step(FinderNames.SUBSYSTEM, "Security")
                 .step(SECURITY_DOMAIN);
         navigation.selectColumn(true);
+        Console.withBrowser(browser).dismissReloadRequiredWindowIfPresent();
         Console.withBrowser(browser).waitUntilLoaded();
     }
 
@@ -95,6 +96,15 @@ public class SecurityPage extends ConfigurationPage implements Navigatable {
         wizard.finish();
     }
 
+    public void addACLModule(String name, String code) {
+        WizardWindow wizard = getResourceManager().addResource();
+        Editor editor = wizard.getEditor();
+        editor.text("name", name);
+        editor.text("code", code);
+        editor.select("flag", "optional");
+        wizard.finish();
+    }
+
     public void addAuditModule(String name, String code) {
         WizardWindow wizard = getResourceManager().addResource();
         Editor editor = wizard.getEditor();
@@ -141,7 +151,7 @@ public class SecurityPage extends ConfigurationPage implements Navigatable {
             navigation.resetNavigation().step(SECURITY_DOMAIN, name).selectRow().invoke("Remove");
         } catch (TimeoutException ignored) {
         }
-        Console.withBrowser(browser).openedWindow(ConfirmationWindow.class).confirm();
+        Console.withBrowser(browser).openedWindow(ConfirmationWindow.class).confirmAndDismissReloadRequiredMessage();
     }
 
     public boolean isDomainPresent(String name) {

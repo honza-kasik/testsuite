@@ -3,73 +3,65 @@ package org.jboss.hal.testsuite.test.configuration.security;
 import org.apache.commons.lang.RandomStringUtils;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.hal.testsuite.category.Shared;
-import org.jboss.hal.testsuite.dmr.AddressTemplate;
-import org.jboss.hal.testsuite.dmr.Operation;
-import org.jboss.hal.testsuite.dmr.ResourceAddress;
+import org.jboss.hal.testsuite.creaper.ResourceVerifier;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
+import org.wildfly.extras.creaper.core.online.operations.Address;
+import org.wildfly.extras.creaper.core.online.operations.OperationException;
+import org.wildfly.extras.creaper.core.online.operations.Values;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
-/**
- * @author Jan Kasik <jkasik@redhat.com>
- *         Created on 16.10.15.
- */
 @RunWith(Arquillian.class)
 @Category(Shared.class)
 public class IdentityTrustTestCase extends SecurityTestCaseAbstract {
 
-    private static final AddressTemplate TRUST_TEMPLATE = SECURITY_DOMAIN_TEMPLATE.append("identity-trust=classic/trust-module=*");
-    private static ResourceAddress TRUST_ADDRESS;
-    private static String loginModule;
+    private static final String TRUST_MODULE_NAME = "tm_" + RandomStringUtils.randomAlphanumeric(6);
+    private static final String TRUST_MODULE_TBA_NAME = "tm-TBA_" + RandomStringUtils.randomAlphanumeric(6);
+    private static final Address TRUST_ADDRESS = JBOSS_EJB_ADDRESS.and("identity-trust", "classic");
+    private static final Address TRUST_MODULE_ADDRESS = TRUST_ADDRESS.and("trust-module", TRUST_MODULE_NAME);
+    private static final Address TRUST_MODULE_TBA_ADDRESS = TRUST_ADDRESS.and("trust-module", TRUST_MODULE_TBA_NAME);
 
     @BeforeClass
-    public static void setUp() {
-        loginModule = addTrustModule();
-        TRUST_ADDRESS = TRUST_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, loginModule);
+    public static void setUp() throws InterruptedException, TimeoutException, IOException {
+        operations.add(TRUST_ADDRESS);
+        operations.add(TRUST_MODULE_ADDRESS, Values.of("code", RandomStringUtils.randomAlphanumeric(8))
+                .and("flag", "optional"));
+        administration.reloadIfRequired();
+    }
+
+    @AfterClass
+    public static void afterClass() throws IOException, OperationException, TimeoutException, InterruptedException {
+        operations.removeIfExists(TRUST_MODULE_ADDRESS);
+        operations.removeIfExists(TRUST_MODULE_TBA_ADDRESS);
+        operations.removeIfExists(TRUST_ADDRESS);
+        administration.reloadIfRequired();
     }
 
     @Before
     public void before() {
         page.viewJBossEJBPolicy();
         page.switchToIdentityTrust();
-        page.selectModule(loginModule);
+        page.selectModule(TRUST_MODULE_NAME);
     }
 
     @Test
-    public void editCode() throws IOException, InterruptedException {
-        editTextAndVerify(TRUST_ADDRESS, CODE, CODE_ATTR);
+    public void editCode() throws Exception {
+        editTextAndVerify(TRUST_MODULE_ADDRESS, CODE, CODE_ATTR);
     }
 
     @Test
-    public void addTrustModuleInGUI() {
-        String name = "tm_" + RandomStringUtils.randomAlphanumeric(6);
-        String code = "code_" + RandomStringUtils.randomAlphanumeric(6) + "-" + name;
-        page.addTrustModule(name, code);
-        Assert.assertTrue("Trust module should be present in table", page.getConfigFragment().resourceIsPresent(name));
-        verifier.verifyResource(TRUST_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, name));
-    }
-
-    private static String addTrustModule() {
-        addIdentityTrust();
-        String name = "tm_" + RandomStringUtils.randomAlphanumeric(6);
-        dispatcher.execute(new Operation.Builder("add", TRUST_TEMPLATE.resolve(context, JBOSS_EJB_POLICY, name))
-                .param("code", RandomStringUtils.randomAlphanumeric(8))
-                .param("flag", "optional")
-                .build());
-        reloadIfRequiredAndWaitForRunning();
-        return name;
-    }
-
-    private static void addIdentityTrust() {
-        dispatcher.execute(new Operation.Builder("add", SECURITY_DOMAIN_TEMPLATE
-                .append("identity-trust=classic")
-                .resolve(context, JBOSS_EJB_POLICY))
-                .build());
-        reloadIfRequiredAndWaitForRunning();
+    public void addTrustModuleInGUI() throws Exception {
+        String code = "code_" + RandomStringUtils.randomAlphanumeric(6) + "-" + TRUST_MODULE_TBA_NAME;
+        page.addTrustModule(TRUST_MODULE_TBA_NAME, code);
+        Assert.assertTrue("Trust module should be present in table", page.getConfigFragment()
+                .resourceIsPresent(TRUST_MODULE_TBA_NAME));
+        new ResourceVerifier(TRUST_MODULE_TBA_ADDRESS, client).verifyExists();
     }
 }
