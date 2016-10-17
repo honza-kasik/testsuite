@@ -1,6 +1,5 @@
-# Testsuite
-Selenium testsuite for the HAL management console. It uses [Drone](https://docs.jboss.org/author/display/ARQ/Drone) 
-and [Graphene](https://docs.jboss.org/author/display/ARQGRA2/Home) Arquillian extensions.
+# Testsuite [![Build Status](https://travis-ci.org/hal/testsuite.svg?branch=master)](https://travis-ci.org/hal/testsuite)
+Selenium testsuite for the HAL management console. It uses [Drone](https://docs.jboss.org/author/display/ARQ/Drone) and [Graphene](https://docs.jboss.org/author/display/ARQGRA2/Home) Arquillian extensions.
 
 ## Prerequisites
 
@@ -39,8 +38,8 @@ Can be one of those:
 
 ### Required jboss.dist parameter
 
-Path to server home folder. Server is expected to be already manually started. 
-In case of standalone mode standalone-full-ha configuration is expected. 
+Path to server home folder. Server is expected to be already manually started.
+In case of standalone mode standalone-full-ha configuration is expected.
 E.g. `-Djboss.dist=/home/user/workspace/wildfly/build/target/wildfly-9.0.0.Alpha2-SNAPSHOT/`
 
 ### Optional arq.extension.webdriver.firefox_binary parameter
@@ -55,7 +54,7 @@ E.g. `-Dtake.screenshot.after.each.test=true`
 
 ### Optional federation.already.enabled parameter
 
-If PicketLink federation subsystem should be enabled  for related tests 
+If PicketLink federation subsystem should be enabled for related tests
 (otherwise it is assumed the subsystem is already configured and should not be added before tests and removed after them)
 E.g. `-Dfederation.already.enabled=true`
 
@@ -89,7 +88,7 @@ Should contain RBAC related tests. To setup WildFly/EAP for HAL RBAC tests pleas
 
 ## Tips
 
-* If you want tests to be run on background use vncserver. E.g. 
+* If you want tests to be run on background use vncserver. E.g.
 
 `vncserver :10 -geometry 1920x1080`
 
