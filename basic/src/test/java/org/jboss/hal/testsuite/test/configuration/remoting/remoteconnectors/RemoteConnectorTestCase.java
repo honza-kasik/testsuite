@@ -5,18 +5,17 @@ import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.drone.api.annotation.Drone;
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.arquillian.junit.Arquillian;
-import org.jboss.hal.testsuite.category.Shared;
 import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
 import org.jboss.hal.testsuite.creaper.ResourceVerifier;
 import org.jboss.hal.testsuite.creaper.command.AddSocketBinding;
 import org.jboss.hal.testsuite.page.config.RemotingSubsystemPage;
+import org.jboss.hal.testsuite.util.AvailablePortFinder;
 import org.jboss.hal.testsuite.util.ConfigChecker;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
 import org.wildfly.extras.creaper.commands.socketbindings.RemoveSocketBinding;
@@ -38,7 +37,6 @@ import java.util.concurrent.TimeoutException;
  */
 @RunWith(Arquillian.class)
 @RunAsClient
-@Category(Shared.class)
 public class RemoteConnectorTestCase {
 
     @Drone
@@ -66,10 +64,10 @@ public class RemoteConnectorTestCase {
 
     @BeforeClass
     public static void beforeClass() throws CommandFailedException, IOException, TimeoutException, InterruptedException {
-        client.apply(new AddSocketBinding.Builder(SOCKET_BINDING_1).build());
-        client.apply(new AddSocketBinding.Builder(SOCKET_BINDING_2).build());
-        client.apply(new AddSocketBinding.Builder(SOCKET_BINDING_3).build());
-        client.apply(new AddSocketBinding.Builder(SOCKET_BINDING_4).build());
+        createSocketBinding(SOCKET_BINDING_1);
+        createSocketBinding(SOCKET_BINDING_2);
+        createSocketBinding(SOCKET_BINDING_3);
+        createSocketBinding(SOCKET_BINDING_4);
         operations.add(CONNECTOR_ADDRESS, Values.of(SOCKET_BINDING, SOCKET_BINDING_1)).assertSuccess();
         operations.add(CONNECTOR_TBR_ADDRESS, Values.of(SOCKET_BINDING, SOCKET_BINDING_2)).assertSuccess();
         administration.reloadIfRequired();
@@ -135,7 +133,12 @@ public class RemoteConnectorTestCase {
         } finally {
             operations.writeAttribute(CONNECTOR_ADDRESS, SOCKET_BINDING, originalModelNodeResult.value());
         }
+    }
 
+    private static void createSocketBinding(String name) throws CommandFailedException {
+        client.apply(new AddSocketBinding.Builder(name)
+                .port(AvailablePortFinder.getNextAvailableNonPrivilegedPort())
+                .build());
     }
 
 }
