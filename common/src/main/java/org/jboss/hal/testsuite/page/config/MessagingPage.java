@@ -5,6 +5,7 @@ import org.jboss.arquillian.graphene.findby.ByJQuery;
 import org.jboss.hal.testsuite.finder.Application;
 import org.jboss.hal.testsuite.finder.FinderFragment;
 import org.jboss.hal.testsuite.finder.FinderNames;
+import org.jboss.hal.testsuite.finder.FinderNavigation;
 import org.jboss.hal.testsuite.fragment.ConfigFragment;
 import org.jboss.hal.testsuite.fragment.WindowFragment;
 import org.jboss.hal.testsuite.fragment.config.messaging.AddBridgeWizard;
@@ -64,6 +65,18 @@ public class MessagingPage extends ConfigPage implements Navigatable {
        finderFragment.invoke(action);
     }
 
+    private void invokeActionOnMessagingProviderRowWithProfile(String action, String name, String profile) {
+        FinderFragment finderFragment = new FinderNavigation(browser, DomainConfigEntryPoint.class)
+                .step(FinderNames.CONFIGURATION, FinderNames.PROFILES)
+                .step(FinderNames.PROFILE, profile)
+                .step(FinderNames.SUBSYSTEM, MESSAGING_SUBSYSTEM_LABEL)
+                .step(SETTINGS_LABEL, MESSAGING_PROVIDER_LABEL)
+                .step(MESSAGING_PROVIDER_LABEL, name)
+                .selectRow();
+        Console.withBrowser(browser).dismissReloadRequiredWindowIfPresent();
+        finderFragment.invoke(action);
+    }
+
     public ConfirmationWindow removeMessagingProvider(String name) {
         invokeActionOnMessagingProviderRow(FinderNames.REMOVE, name);
         return Console.withBrowser(browser).openedWindow(ConfirmationWindow.class);
@@ -71,6 +84,11 @@ public class MessagingPage extends ConfigPage implements Navigatable {
 
     public void viewClusteringSettings(String name) {
         invokeActionOnMessagingProviderRow("Clustering", name);
+        Application.waitUntilVisible();
+    }
+
+    public void viewClusteringSettingsOnProfile(String name, String profile) {
+        invokeActionOnMessagingProviderRowWithProfile("Clustering", name, profile);
         Application.waitUntilVisible();
     }
 

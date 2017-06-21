@@ -3,9 +3,12 @@ package org.jboss.hal.testsuite.test.configuration.messaging.clustering;
 import org.apache.commons.lang.RandomStringUtils;
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
 import org.jboss.hal.testsuite.creaper.ResourceVerifier;
 import org.jboss.hal.testsuite.page.config.MessagingPage;
 import org.jboss.hal.testsuite.test.configuration.messaging.AbstractMessagingTestCase;
+import org.jboss.hal.testsuite.util.ConfigChecker;
+import org.jboss.hal.testsuite.util.ConfigUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -14,8 +17,10 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.wildfly.extras.creaper.core.CommandFailedException;
+import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 import org.wildfly.extras.creaper.core.online.operations.Address;
 import org.wildfly.extras.creaper.core.online.operations.OperationException;
+import org.wildfly.extras.creaper.core.online.operations.Operations;
 import org.wildfly.extras.creaper.core.online.operations.Values;
 
 import java.io.IOException;
@@ -23,42 +28,52 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import static org.jboss.hal.testsuite.util.ConfigChecker.InputType.TEXT;
+
 @RunWith(Arquillian.class)
 public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
 
-    private static final String DG_NAME = "dg-group-test" + RandomStringUtils.randomAlphanumeric(6);
-    private static final String DG_TBR_NAME = "dg-group-test" + RandomStringUtils.randomAlphanumeric(6);
-    private static final String DG_TBA_NAME = "dg-group-test" + RandomStringUtils.randomAlphanumeric(6);
-
     private static final String
+            REFRESH_TIMEOUT = "refresh-timeout",
+            INITIAL_WAIT_TIMEOUT = "initial-wait-timeout",
             JGROUPS_CHANNEL = "jgroups-channel",
             DISCOVERY_GROUP = "discovery-group",
             SOCKET_BINDING = "socket-binding";
 
-    private static final Address DG_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP, DG_NAME);
-    private static final Address DG_TBR_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP, DG_TBR_NAME);
-    private static final Address DG_TBA_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP, DG_TBA_NAME);
-    private static final Address DG_TBA2_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP, "dg-group_TBA2_" + RandomStringUtils.randomAlphanumeric(5));
-    private static final Address DG_INV_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP, "dg-group_INV_" + RandomStringUtils.randomAlphanumeric(5));
+    private static final Address DG_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
+            "dg-group_" + RandomStringUtils.randomAlphabetic(7));
+    private static final Address DG_TBR_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
+            "dg-group_TBR_" + RandomStringUtils.randomAlphabetic(7));
+    private static final Address DG_TBA_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
+            "dg-group_TBA_" + RandomStringUtils.randomAlphabetic(7));
+    private static final Address DG_TBA2_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
+            "dg-group_TBA2_" + RandomStringUtils.randomAlphanumeric(5));
+    private static final Address DG_INV_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
+            "dg-group_INV_" + RandomStringUtils.randomAlphanumeric(5));
 
     private static final List<String> socketBindings = new LinkedList<>();
+
+    private static final OnlineManagementClient discoveryGroupClient =  ConfigUtils.isDomain() ?
+            ManagementClientProvider.withProfile("full-ha") :
+            client;
+    private static final Operations discoveryGroupOps = new Operations(discoveryGroupClient);
 
     @BeforeClass
     public static void setUp() throws Exception {
         socketBindings.add(createSocketBinding());
         socketBindings.add(createSocketBinding());
-        operations.add(DG_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
-        operations.add(DG_TBR_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
+        discoveryGroupOps.add(DG_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
+        discoveryGroupOps.add(DG_TBR_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
         administration.reloadIfRequired();
     }
 
     @AfterClass
     public static void tearDown() throws IOException, OperationException, CommandFailedException, TimeoutException, InterruptedException {
-        operations.removeIfExists(DG_ADDRESS);
-        operations.removeIfExists(DG_TBA_ADDRESS);
-        operations.removeIfExists(DG_TBA2_ADDRESS);
-        operations.removeIfExists(DG_TBR_ADDRESS);
-        operations.removeIfExists(DG_INV_ADDRESS);
+        discoveryGroupOps.removeIfExists(DG_ADDRESS);
+        discoveryGroupOps.removeIfExists(DG_TBA_ADDRESS);
+        discoveryGroupOps.removeIfExists(DG_TBA2_ADDRESS);
+        discoveryGroupOps.removeIfExists(DG_TBR_ADDRESS);
+        discoveryGroupOps.removeIfExists(DG_INV_ADDRESS);
     }
 
     @Page
@@ -66,9 +81,13 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
 
     @Before
     public void before() {
-        page.viewClusteringSettings("default");
+        if (ConfigUtils.isDomain()) {
+            page.viewClusteringSettingsOnProfile("default", "full-ha");
+        } else {
+            page.viewClusteringSettings("default");
+        }
         page.switchToDiscovery();
-        page.selectInTable(DG_NAME, 0);
+        page.selectInTable(DG_ADDRESS.getLastPairValue(), 0);
     }
 
     @Ignore("Ignored until https://issues.jboss.org/browse/WFLY-6607 is resolved")
@@ -97,7 +116,7 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
         Assert.assertTrue("Discovery group should be present!",
                 page.getResourceManager().isResourcePresent(DG_TBA2_ADDRESS.getLastPairValue()));
 
-        new ResourceVerifier(DG_TBA2_ADDRESS, client).verifyExists();
+        new ResourceVerifier(DG_TBA2_ADDRESS, discoveryGroupClient).verifyExists();
     }
 
     @Test
@@ -110,7 +129,7 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
         Assert.assertFalse("Discovery group should NOT be present!",
                 page.getResourceManager().isResourcePresent(DG_INV_ADDRESS.getLastPairValue()));
 
-        new ResourceVerifier(DG_INV_ADDRESS, client).verifyDoesNotExist();
+        new ResourceVerifier(DG_INV_ADDRESS, discoveryGroupClient).verifyDoesNotExist();
     }
 
     @Ignore("Ignored until https://issues.jboss.org/browse/WFLY-6607 is resolved")
@@ -121,30 +140,48 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
 
     @Test
     public void updateDiscoveryGroupRefreshTimeout() throws Exception {
-        editTextAndVerify(DG_ADDRESS, "refresh-timeout", 2000L);
+        final long value = 2000;
+        new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
+                .configFragment(page.getConfigFragment())
+                .editAndSave(TEXT, REFRESH_TIMEOUT, String.valueOf(value))
+                .verifyFormSaved()
+                .verifyAttribute(REFRESH_TIMEOUT, value);
     }
 
     @Test
-    public void updateBroadcastGroupRefreshTimeoutNegativeValue() {
-        verifyIfErrorAppears("refresh-timeout", "-1");
+    public void updateBroadcastGroupRefreshTimeoutNegativeValue() throws Exception {
+        new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
+                .configFragment(page.getConfigFragment())
+                .editAndSave(TEXT, REFRESH_TIMEOUT, "-1")
+                .verifyFormNotSaved();
     }
 
     @Test
     public void updateDiscoveryGroupInitialTimeout() throws Exception {
-        editTextAndVerify(DG_ADDRESS, "initial-wait-timeout", 200L);
+        final long value = 200;
+        new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
+                .configFragment(page.getConfigFragment())
+                .editAndSave(TEXT, INITIAL_WAIT_TIMEOUT, String.valueOf(value))
+                .verifyFormSaved()
+                .verifyAttribute(INITIAL_WAIT_TIMEOUT, value);
     }
 
     @Test
-    public void updateBroadcastGroupInitialTimeoutNegativeValue() {
-        verifyIfErrorAppears("initial-wait-timeout", "-1");
+    public void updateBroadcastGroupInitialTimeoutNegativeValue() throws Exception {
+        new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
+                .configFragment(page.getConfigFragment())
+                .editAndSave(TEXT, INITIAL_WAIT_TIMEOUT, "-1")
+                .verifyFormNotSaved();
     }
 
     @Test
     public void removeDiscoveryGroup() throws Exception {
-        page.selectInTable(DG_TBR_NAME, 0);
-        page.remove();
+        page.getResourceManager()
+                .removeResourceAndConfirm(DG_TBR_ADDRESS.getLastPairValue());
 
-        new ResourceVerifier(DG_TBR_ADDRESS, client).verifyDoesNotExist();
+        Assert.assertFalse(page.getResourceManager().isResourcePresent(DG_TBR_ADDRESS.getLastPairValue()));
+
+        new ResourceVerifier(DG_TBR_ADDRESS, discoveryGroupClient).verifyDoesNotExist();
     }
 
 }

@@ -3,7 +3,6 @@ package org.jboss.hal.testsuite.test.configuration.messaging;
 import org.apache.commons.lang.RandomStringUtils;
 import org.jboss.arquillian.drone.api.annotation.Drone;
 import org.jboss.arquillian.graphene.page.Page;
-import org.jboss.dmr.ModelNode;
 import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
 import org.jboss.hal.testsuite.creaper.ResourceVerifier;
 import org.jboss.hal.testsuite.creaper.command.AddSocketBinding;
@@ -34,10 +33,7 @@ public abstract class AbstractMessagingTestCase {
     protected static Administration administration;
     protected static Operations operations;
 
-    protected static final Address MESSAGING_SUBSYSTEM = client.options().isDomain ?
-            Address.of("profile", client.options().defaultProfile)
-                    .and("subsystem", "messaging-activemq") :
-            Address.subsystem("messaging-activemq");
+    protected static final Address MESSAGING_SUBSYSTEM = Address.subsystem("messaging-activemq");
 
     protected static final Address DEFAULT_MESSAGING_SERVER = MESSAGING_SUBSYSTEM.and("server", "default");
 
@@ -120,37 +116,12 @@ public abstract class AbstractMessagingTestCase {
         new ResourceVerifier(address, client, 500).verifyAttribute(name, value);
     }
 
-    protected void editTextAreaAndVerify(Address address, String name, String[] values) throws Exception {
-        boolean finished = page.getConfigFragment().editTextAndSave(name, String.join("\n", values));
-
-        assertTrue("Config should be saved and closed.", finished);
-
-        ModelNode modelNode = new ModelNode();
-
-        for (String value : values) {
-            modelNode.add(value);
-        }
-
-        new ResourceVerifier(address, client, 500).verifyAttribute(name, modelNode);
-    }
-
     protected void verifyIfErrorAppears(String identifier, String value) {
         ConfigFragment config = page.getConfigFragment();
         config.editTextAndSave(identifier, value);
         Assert.assertTrue(config.isErrorShownInForm());
         config.cancel();
     }
-
-    protected void undefineAndVerify(Address address, String identifier, String attributeName) throws Exception {
-        page.getConfigFragment().editTextAndSave(identifier, "");
-        administration.reloadIfRequired();
-        new ResourceVerifier(address, client).verifyAttributeIsUndefined(attributeName);
-    }
-
-    protected void undefineAndVerify(Address address, String identifier) throws Exception {
-        undefineAndVerify(address, identifier, identifier);
-    }
-
     protected static String createSocketBinding(String name) throws CommandFailedException {
         client.apply(new AddSocketBinding.Builder(name)
                 .port(AvailablePortFinder.getNextAvailableNonPrivilegedPort())
