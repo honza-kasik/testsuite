@@ -2,30 +2,29 @@ package org.jboss.hal.testsuite.test.runtime.hosts;
 
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.hal.testsuite.category.Domain;
-import org.jboss.hal.testsuite.dmr.AddressTemplate;
 import org.jboss.hal.testsuite.fragment.ConfigAreaFragment;
 import org.jboss.hal.testsuite.util.ConfigUtils;
+import org.junit.BeforeClass;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
+import org.wildfly.extras.creaper.core.online.operations.Address;
 
-/**
- * @author Jan Kasik <jkasik@redhat.com>
- *         Created on 23.10.15.
- */
 @RunWith(Arquillian.class)
 @Category(Domain.class)
 public class ServerPropertiesTestCase extends PropertiesTestCaseAbstract {
 
-    @Override
-    protected void navigate() {
-        page.navigate();
-        page.viewServerConfiguration("server-one");
-        page.getConfig(ConfigAreaFragment.class).switchTo("System Properties");
+
+    private static final Address SERVER_ADDRESS = Address.host(ConfigUtils.getDefaultHost()).and(SERVER_CONFIG, "server-one");
+
+    @BeforeClass
+    public static void beforeClass() {
+        serverAddress = SERVER_ADDRESS;
     }
 
     @Override
-    protected void verifyOnServer(String propertyName, boolean shouldExist) {
-        AddressTemplate template = AddressTemplate.of("/host=" + ConfigUtils.getDefaultHost() + "/server=server-one/system-property=*");
-        verifier.verifyResource(template.resolve(context, propertyName), shouldExist);
+    protected void navigate() {
+        page.navigate();
+        page.viewServerConfiguration(SERVER_ADDRESS.getLastPairValue());
+        page.getConfig(ConfigAreaFragment.class).switchTo("System Properties");
     }
 }
