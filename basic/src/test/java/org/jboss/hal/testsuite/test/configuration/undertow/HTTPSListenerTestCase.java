@@ -27,7 +27,12 @@ import org.wildfly.extras.creaper.core.online.operations.OperationException;
 import org.wildfly.extras.creaper.core.online.operations.ReadAttributeOption;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
+
+import static org.jboss.hal.testsuite.util.ConfigChecker.InputType.SELECT;
+import static org.jboss.hal.testsuite.util.ConfigChecker.InputType.TEXT;
 
 @RunWith(Arquillian.class)
 @Category(Shared.class)
@@ -45,6 +50,8 @@ public class HTTPSListenerTestCase extends UndertowTestCaseAbstract {
             BUFFER_POOL = "buffer-pool",
             DECODE_URL = "decode-url",
             ENABLE_HTTP2 = "enable-http2",
+            ENABLED_CIPHER_SUITS = "enabled-cipher-suites",
+            ENABLED_PROTOCOLS = "enabled-protocols",
             MAX_BUFFERED_REQUEST_SIZE = "max-buffered-request-size",
             MAX_CONNECTIONS = "max-connections",
             MAX_COOKIES = "max-cookies",
@@ -333,7 +340,7 @@ public class HTTPSListenerTestCase extends UndertowTestCaseAbstract {
         try {
             new ConfigChecker.Builder(client, HTTPS_LISTENER_ADDRESS)
                     .configFragment(page.getConfigFragment())
-                    .editAndSave(ConfigChecker.InputType.TEXT, SOCKET_BINDING, socketBinding)
+                    .editAndSave(TEXT, SOCKET_BINDING, socketBinding)
                     .verifyFormSaved()
                     .verifyAttribute(SOCKET_BINDING, socketBinding);
         } finally {
@@ -356,8 +363,8 @@ public class HTTPSListenerTestCase extends UndertowTestCaseAbstract {
         try {
             new ConfigChecker.Builder(client, HTTPS_LISTENER_ADDRESS)
                     .configFragment(page.getConfigFragment())
-                    .edit(ConfigChecker.InputType.TEXT, SSL_CONTEXT, serverSSLContextAddress.getLastPairValue())
-                    .edit(ConfigChecker.InputType.TEXT, SECURITY_REALM, RandomStringUtils.randomAlphanumeric(7))
+                    .edit(TEXT, SSL_CONTEXT, serverSSLContextAddress.getLastPairValue())
+                    .edit(TEXT, SECURITY_REALM, RandomStringUtils.randomAlphanumeric(7))
                     .andSave()
                     .verifyFormNotSaved("Probably fails because of https://issues.jboss.org/browse/HAL-1340");
         } finally {
@@ -378,28 +385,40 @@ public class HTTPSListenerTestCase extends UndertowTestCaseAbstract {
                 keyManagerAddress = undertowElytronOperations.createKeyManager(keyStoreAddress),
                 serverSSLContextAddress = undertowElytronOperations.createServerSSLContext(keyManagerAddress);
 
-        final ModelNodeResult sslContextModelNodeResult = operations.readAttribute(HTTPS_LISTENER_ADDRESS, SSL_CONTEXT),
-                securityRealmModelNodeResult = operations.readAttribute(HTTPS_LISTENER_ADDRESS, SECURITY_REALM),
-                verifyClientModelNodeResult = operations.readAttribute(HTTPS_LISTENER_ADDRESS, VERIFY_CLIENT);
+        final Map<String, ConfigChecker.InputType> alternatives = new HashMap<>();
+        alternatives.put(SECURITY_REALM, TEXT);
+        alternatives.put(VERIFY_CLIENT, SELECT);
+        alternatives.put(ENABLED_CIPHER_SUITS, TEXT);
+        alternatives.put(ENABLED_PROTOCOLS, TEXT);
+        alternatives.put(SSL_SESSION_CACHE_SIZE, TEXT);
+        alternatives.put(SSL_SESSION_TIMEOUT, TEXT);
+
+        final Map<String, ModelNodeResult> backedUpValues = new HashMap<>();
+
+        for (String alternative : alternatives.keySet()) {
+            ModelNodeResult modelNodeResult = operations.readAttribute(HTTPS_LISTENER_ADDRESS, alternative);
+            modelNodeResult.assertSuccess();
+            backedUpValues.put(alternative, modelNodeResult);
+        }
+
+        final ModelNodeResult sslContextModelNodeResult = operations.readAttribute(HTTPS_LISTENER_ADDRESS, SSL_CONTEXT);
         sslContextModelNodeResult.assertSuccess();
-        securityRealmModelNodeResult.assertSuccess();
-        verifyClientModelNodeResult.assertSuccess();
 
         try {
-            new ConfigChecker.Builder(client, HTTPS_LISTENER_ADDRESS)
+            final ConfigChecker.Builder builder = new ConfigChecker.Builder(client, HTTPS_LISTENER_ADDRESS)
                     .configFragment(page.getConfigFragment())
-                    .edit(ConfigChecker.InputType.TEXT, SSL_CONTEXT, serverSSLContextAddress.getLastPairValue())
-                    .edit(ConfigChecker.InputType.TEXT, SECURITY_REALM, "")
-                    .edit(ConfigChecker.InputType.SELECT, VERIFY_CLIENT, "")
-                    .andSave()
+                    .edit(TEXT, SSL_CONTEXT, serverSSLContextAddress.getLastPairValue());
+
+            alternatives.forEach((alternativeName, type) -> builder.edit(type, alternativeName, ""));
+
+            builder.andSave()
                     .verifyFormSaved()
                     .verifyAttribute(SSL_CONTEXT, serverSSLContextAddress.getLastPairValue());
         } finally {
-            operations.batch(new Batch()
-                    .writeAttribute(HTTPS_LISTENER_ADDRESS, SSL_CONTEXT, sslContextModelNodeResult.value())
-                    .writeAttribute(HTTPS_LISTENER_ADDRESS, SECURITY_REALM, securityRealmModelNodeResult.value())
-                    .writeAttribute(HTTPS_LISTENER_ADDRESS, VERIFY_CLIENT, verifyClientModelNodeResult.value()))
-                    .assertSuccess();
+            final Batch batch = new Batch()
+                    .writeAttribute(HTTPS_LISTENER_ADDRESS, SSL_CONTEXT, sslContextModelNodeResult.value());
+            backedUpValues.forEach((key, value) -> batch.writeAttribute(HTTPS_LISTENER_ADDRESS, key, value.value()));
+            operations.batch(batch).assertSuccess();
             operations.removeIfExists(serverSSLContextAddress);
             operations.removeIfExists(keyManagerAddress);
             operations.removeIfExists(keyStoreAddress);
