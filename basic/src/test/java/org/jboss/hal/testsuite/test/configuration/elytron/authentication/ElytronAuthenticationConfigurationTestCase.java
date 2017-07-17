@@ -517,9 +517,9 @@ public class ElytronAuthenticationConfigurationTestCase extends AbstractElytronT
                     SECURITY_DOMAIN,
                     () -> {
                         final UndertowElytronOperations undertowElytronOperations = new UndertowElytronOperations(client);
-                        final Address securityDomainAddress = undertowElytronOperations
-                                .createSecurityDomain(undertowElytronOperations.createSecurityRealm().getLastPairValue());
-
+                        final Address securityRealmAddress = undertowElytronOperations.createSecurityRealm(),
+                                securityDomainAddress = undertowElytronOperations
+                                        .createSecurityDomain(securityRealmAddress.getLastPairValue());
                         try {
                             page.navigate();
                             page.switchToAuthenticationConfiguration()
@@ -532,6 +532,7 @@ public class ElytronAuthenticationConfigurationTestCase extends AbstractElytronT
                                     .verifyAttribute(SECURITY_DOMAIN, securityDomainAddress.getLastPairValue());
                         } finally {
                             removeLater.add(securityDomainAddress);
+                            removeLater.add(securityRealmAddress);
                         }
                     }
             );

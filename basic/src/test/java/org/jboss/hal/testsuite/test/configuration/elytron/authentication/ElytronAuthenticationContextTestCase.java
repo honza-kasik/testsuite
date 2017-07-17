@@ -103,6 +103,7 @@ public class ElytronAuthenticationContextTestCase extends AbstractElytronTestCas
                     .verifyAttribute(EXTENDS, extendedContextAddress.getLastPairValue());
         } finally {
             ops.removeIfExists(authenticationContextAddress);
+            ops.removeIfExists(extendedContextAddress);
             adminOps.reloadIfRequired();
         }
     }

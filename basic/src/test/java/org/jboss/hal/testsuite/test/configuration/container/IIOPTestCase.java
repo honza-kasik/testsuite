@@ -50,8 +50,10 @@ import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.wildfly.extras.creaper.core.online.ModelNodeResult;
 import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 import org.wildfly.extras.creaper.core.online.operations.Address;
+import org.wildfly.extras.creaper.core.online.operations.Operations;
 import org.wildfly.extras.creaper.core.online.operations.admin.Administration;
 
 import java.io.IOException;
@@ -79,8 +81,9 @@ public class IIOPTestCase {
     private FinderNavigation transactionNavigation;
     private Address iiopSubsystemAddress = Address.subsystem("iiop-openjdk");
     private Address transactionSubsystemAddress = Address.subsystem("transactions");
-    private static OnlineManagementClient client = ManagementClientProvider.createOnlineManagementClient();
-    private Administration adminOps = new Administration(client);
+    private static final OnlineManagementClient client = ManagementClientProvider.createOnlineManagementClient();
+    private static final Operations operations = new Operations(client);
+    private static final Administration adminOps = new Administration(client);
 
     @AfterClass
     public static void tearDown() {
@@ -179,25 +182,36 @@ public class IIOPTestCase {
     @Test
     @InSequence(4)
     public void setAuthMethodValues() throws Exception {
-        boolean finished;
+        final String attributeName = "auth-method";
 
-        page.switchToEditMode();
-        ConfigFragment editPanelFragment = page.getConfigFragment();
+        final ModelNodeResult originalModelNodeResult = operations.readAttribute(iiopSubsystemAddress, attributeName);
+        originalModelNodeResult.assertSuccess();
 
-        editPanelFragment.getEditor().select("auth-method", "none");
-        finished = editPanelFragment.save();
-        log.debug("f : " + finished);
+        try {
+            boolean finished;
 
-        assertTrue("Config should be saved and closed.", finished);
-        new ResourceVerifier(iiopSubsystemAddress, client).verifyAttribute("auth-method", "none");
+            page.switchToEditMode();
+            ConfigFragment editPanelFragment = page.getConfigFragment();
 
-        page.switchToEditMode();
-        editPanelFragment = page.getConfigFragment();
-        editPanelFragment.getEditor().select("auth-method", "username_password");
-        finished = editPanelFragment.save();
+            editPanelFragment.getEditor().select(attributeName, "none");
+            finished = editPanelFragment.save();
+            log.debug("f : " + finished);
 
-        assertTrue("Config should be saved and closed.", finished);
-        new ResourceVerifier(iiopSubsystemAddress, client).verifyAttribute("auth-method", "username_password");
+            assertTrue("Config should be saved and closed.", finished);
+            new ResourceVerifier(iiopSubsystemAddress, client).verifyAttribute(attributeName, "none");
+
+            page.switchToEditMode();
+            editPanelFragment = page.getConfigFragment();
+            editPanelFragment.getEditor().select(attributeName, "username_password");
+            finished = editPanelFragment.save();
+
+            assertTrue("Config should be saved and closed.", finished);
+            new ResourceVerifier(iiopSubsystemAddress, client).verifyAttribute(attributeName, "username_password");
+        } finally {
+            operations.writeAttribute(iiopSubsystemAddress, attributeName, originalModelNodeResult.value()).assertSuccess();
+            adminOps.reloadIfRequired();
+        }
+
     }
 
     @Test

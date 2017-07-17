@@ -14,6 +14,7 @@ import org.jboss.hal.testsuite.test.util.ConfigAreaChecker;
 import org.jboss.hal.testsuite.util.AvailablePortFinder;
 import org.jboss.hal.testsuite.util.ResourceVerifier;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -23,6 +24,7 @@ import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.wildfly.extras.creaper.commands.foundation.online.SnapshotBackup;
 import org.wildfly.extras.creaper.core.CommandFailedException;
 import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 
@@ -83,9 +85,12 @@ public class ModClusterTestCase {
     private static final String NUMERIC_VALUE_NEGATIVE = "-50";
     private static final String NUMERIC_VALUE_INVALID = "50" + RandomStringUtils.randomAlphabetic(3);
 
+    private static final OnlineManagementClient managementClient = ManagementClientProvider.createOnlineManagementClient();
     private CliClient client = CliClientFactory.getClient();
     private ResourceVerifier verifier = new ResourceVerifier(MOD_CLUSTER_CONFIG_ADDRESS, client);
     private ConfigAreaChecker checker = new ConfigAreaChecker(verifier);
+
+    private static final SnapshotBackup snapshotBackup = new SnapshotBackup();
 
     @Drone
     public WebDriver browser;
@@ -95,16 +100,24 @@ public class ModClusterTestCase {
 
     @BeforeClass
     public static void beforeClass() throws IOException, CommandFailedException {
-        try (OnlineManagementClient client = ManagementClientProvider.createOnlineManagementClient()) {
-            int port = AvailablePortFinder.getNextAvailableNonPrivilegedPort();
-            int multicastPort = AvailablePortFinder.getNextAvailableNonPrivilegedPort();
-            log.info("Obtained port for socket binding '" + ADVERTISE_SOCKET_VALUE + "' is " + port +
-                    ", multicast port is " + multicastPort);
-            client.apply(new AddSocketBinding.Builder(ADVERTISE_SOCKET_VALUE)
-                    .port(port)
-                    .multicastAddress("224.0.0.1")
-                    .multicastPort(multicastPort)
-                    .build());
+        int port = AvailablePortFinder.getNextAvailableNonPrivilegedPort();
+        int multicastPort = AvailablePortFinder.getNextAvailableNonPrivilegedPort();
+        log.info("Obtained port for socket binding '" + ADVERTISE_SOCKET_VALUE + "' is " + port +
+                ", multicast port is " + multicastPort);
+        managementClient.apply(new AddSocketBinding.Builder(ADVERTISE_SOCKET_VALUE)
+                .port(port)
+                .multicastAddress("224.0.0.1")
+                .multicastPort(multicastPort)
+                .build());
+        managementClient.apply(snapshotBackup.backup());
+    }
+
+    @AfterClass
+    public static void afterClass() throws CommandFailedException, IOException {
+        try {
+            managementClient.apply(snapshotBackup.restore());
+        } finally {
+            managementClient.close();
         }
     }
 

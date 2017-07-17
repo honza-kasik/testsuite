@@ -64,10 +64,15 @@ public class FormatterTestCase extends LoggingAbstractTestCase {
 
     @Test
     public void addFormatter() throws Exception {
-        String name = "Formatter_" + RandomStringUtils.randomAlphanumeric(5);
-        page.addFormatter(name);
+        final Address formatterAddress = LOGGING_SUBSYSTEM.and("pattern-formatter",
+                "Formatter_" + RandomStringUtils.randomAlphanumeric(5));
+        try {
+            page.addFormatter(formatterAddress.getLastPairValue());
 
-        new ResourceVerifier(LOGGING_SUBSYSTEM.and("pattern-formatter", name), client).verifyExists();
+            new ResourceVerifier(formatterAddress, client).verifyExists();
+        } finally {
+            operations.removeIfExists(formatterAddress);
+        }
     }
 
     @Test

@@ -4,7 +4,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.jboss.arquillian.drone.api.annotation.Drone;
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.arquillian.junit.Arquillian;
-import org.jboss.hal.testsuite.category.Shared;
 import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
 import org.jboss.hal.testsuite.creaper.ResourceVerifier;
 import org.jboss.hal.testsuite.creaper.command.BackupAndRestoreAttributes;
@@ -17,9 +16,9 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
+import org.wildfly.extras.creaper.commands.foundation.online.SnapshotBackup;
 import org.wildfly.extras.creaper.core.CommandFailedException;
 import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 import org.wildfly.extras.creaper.core.online.operations.Address;
@@ -34,7 +33,6 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 @RunWith(Arquillian.class)
-@Category(Shared.class)
 public class ConfigurationChangesTestCase {
 
     private static final String LISTS_NOT_EQUAL_MESSAGE = "Some unexpected differences found! Either some changes are " +
@@ -129,24 +127,31 @@ public class ConfigurationChangesTestCase {
     public void generateSomeRecordsAndVerifyAllRelevantRecordsAreShownAfterRefresh()
             throws IOException, ParseException, TimeoutException, InterruptedException, CommandFailedException {
         //generate records
-        BackupAndRestoreAttributes backup = new BackupAndRestoreAttributes.Builder(Address.subsystem("datasources")
+        final SnapshotBackup snapshotBackup = new SnapshotBackup();
+        try {
+            client.apply(snapshotBackup.backup());
+
+            BackupAndRestoreAttributes backup = new BackupAndRestoreAttributes.Builder(Address.subsystem("datasources")
                     .and("data-source", "ExampleDS"))
-                .build();
-        client.apply(backup.backup());
-        client.apply(backup.restore());
+                    .build();
+            client.apply(backup.backup());
+            client.apply(backup.restore());
 
-        Console.withBrowser(browser).dismissReloadRequiredWindowIfPresent();
-        administration.reloadIfRequired();
+            Console.withBrowser(browser).dismissReloadRequiredWindowIfPresent();
+            administration.reloadIfRequired();
 
-        //new records were generated but they should not be present in GUI yet
+            //new records were generated but they should not be present in GUI yet
 
-        Assert.assertNotEquals(page.getConfigurationChangesTable().getAllConfigurationChanges(),
-                changesResource.getAllConfigurationChanges());
+            Assert.assertNotEquals(page.getConfigurationChangesTable().getAllConfigurationChanges(),
+                    changesResource.getAllConfigurationChanges());
 
-        page.refresh();
+            page.refresh();
 
-        assertListEquals(LISTS_NOT_EQUAL_MESSAGE, changesResource.getAllConfigurationChanges(),
-                page.getConfigurationChangesTable().getAllConfigurationChanges());
+            assertListEquals(LISTS_NOT_EQUAL_MESSAGE, changesResource.getAllConfigurationChanges(),
+                    page.getConfigurationChangesTable().getAllConfigurationChanges());
+        } finally {
+            client.apply(snapshotBackup.restore());
+        }
     }
 
     private static void assertListEquals(List expected, List actual) {

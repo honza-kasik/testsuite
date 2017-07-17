@@ -62,7 +62,7 @@ public final class UndertowOperations {
                 .keystorePath(getClass().getClassLoader().getResource("clientkeystore").getPath())
                 .build());
         administration.reload();
-        referenceHolder.saveReference(name, ReferenceType.BUFFER_CACHE);
+        referenceHolder.saveReference(name, ReferenceType.SECURITY_REALM);
         return name;
     }
 

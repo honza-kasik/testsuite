@@ -16,8 +16,10 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
 import org.wildfly.extras.creaper.core.CommandFailedException;
+import org.wildfly.extras.creaper.core.online.ModelNodeResult;
 import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 import org.wildfly.extras.creaper.core.online.operations.Address;
+import org.wildfly.extras.creaper.core.online.operations.Operations;
 import org.wildfly.extras.creaper.core.online.operations.admin.Administration;
 
 import java.io.IOException;
@@ -42,6 +44,8 @@ public class WebServicesTestCase {
 
     private static final OnlineManagementClient client = ManagementClientProvider.createOnlineManagementClient();
     private static final Administration administration = new Administration(client);
+    private static final Operations operations = new Operations(client);
+
     private static final Address WEBSERVICES_ADDRESS = Address.subsystem("webservices");
 
     private static BackupAndRestoreAttributes backup;
@@ -76,17 +80,24 @@ public class WebServicesTestCase {
 
     @Test
     public void modifySoapAddress() throws Exception {
-        new ConfigChecker.Builder(client, WEBSERVICES_ADDRESS)
-                .configFragment(page.getConfigFragment())
-                .editAndSave(ConfigChecker.InputType.CHECKBOX, MODIFY_SOAP_ADDRESS, false)
-                .verifyFormSaved()
-                .verifyAttribute(MODIFY_SOAP_ADDRESS, false);
+        final ModelNodeResult originalModelNodeResult = operations.readAttribute(WEBSERVICES_ADDRESS, MODIFY_SOAP_ADDRESS);
+        originalModelNodeResult.assertSuccess();
+        final boolean originalBooleanValue = originalModelNodeResult.booleanValue();
+        try {
+            new ConfigChecker.Builder(client, WEBSERVICES_ADDRESS)
+                    .configFragment(page.getConfigFragment())
+                    .editAndSave(ConfigChecker.InputType.CHECKBOX, MODIFY_SOAP_ADDRESS, !originalBooleanValue)
+                    .verifyFormSaved()
+                    .verifyAttribute(MODIFY_SOAP_ADDRESS, !originalBooleanValue);
 
-        new ConfigChecker.Builder(client, WEBSERVICES_ADDRESS)
-                .configFragment(page.getConfigFragment())
-                .editAndSave(ConfigChecker.InputType.CHECKBOX, MODIFY_SOAP_ADDRESS, true)
-                .verifyFormSaved()
-                .verifyAttribute(MODIFY_SOAP_ADDRESS, true);
+            new ConfigChecker.Builder(client, WEBSERVICES_ADDRESS)
+                    .configFragment(page.getConfigFragment())
+                    .editAndSave(ConfigChecker.InputType.CHECKBOX, MODIFY_SOAP_ADDRESS, originalBooleanValue)
+                    .verifyFormSaved()
+                    .verifyAttribute(MODIFY_SOAP_ADDRESS, originalBooleanValue);
+        } finally {
+            operations.writeAttribute(WEBSERVICES_ADDRESS, MODIFY_SOAP_ADDRESS, originalModelNodeResult.value());
+        }
     }
 
     @Test
