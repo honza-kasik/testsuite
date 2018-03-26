@@ -1,6 +1,7 @@
 package org.jboss.hal.testsuite.util.junit;
 
 import org.jboss.arquillian.junit.Arquillian;
+import org.junit.Ignore;
 import org.junit.runner.Description;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.Parameterized;
@@ -20,11 +21,13 @@ import java.util.List;
 public class ArquillianParametrized extends ParentRunner<Arquillian> {
 
     private List<Arquillian> arquillians = new ArrayList<>();
+    private final List<FrameworkMethod> ignoredMethods;
 
     public ArquillianParametrized(Class<?> testClass) throws Throwable {
         super(testClass);
         Parameterized.Parameters parameters = getParametersMethod().getAnnotation(
                 Parameterized.Parameters.class);
+        ignoredMethods = new ArrayList<>(getTestClass().getAnnotatedMethods(Ignore.class));
         createRunnersForParameters(allParameters(), parameters.name());
     }
 
@@ -40,6 +43,12 @@ public class ArquillianParametrized extends ParentRunner<Arquillian> {
 
     @Override
     protected void runChild(Arquillian child, RunNotifier notifier) {
+        // This is a workaround for parameterized test cases which single test method is ignored
+        // @Drone at this point fails to instantiate, which results in not understandable surefire reports
+        if (ignoredMethods.size() == 1) {
+            notifier.fireTestIgnored(getDescription());
+            return;
+        }
         child.run(notifier);
     }
 

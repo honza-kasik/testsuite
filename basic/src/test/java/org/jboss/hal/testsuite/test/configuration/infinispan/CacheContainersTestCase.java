@@ -13,10 +13,11 @@ import org.jboss.hal.testsuite.fragment.config.infinispan.CacheContainerWizard;
 import org.jboss.hal.testsuite.page.config.CacheContainersPage;
 import org.jboss.hal.testsuite.util.ConfigChecker;
 import org.jboss.hal.testsuite.util.ConfigChecker.InputType;
-import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
@@ -24,7 +25,6 @@ import org.wildfly.extras.creaper.core.online.OnlineManagementClient;
 import org.wildfly.extras.creaper.core.online.operations.Address;
 import org.wildfly.extras.creaper.core.online.operations.OperationException;
 import org.wildfly.extras.creaper.core.online.operations.Operations;
-import org.wildfly.extras.creaper.core.online.operations.Values;
 import org.wildfly.extras.creaper.core.online.operations.admin.Administration;
 
 import java.io.IOException;
@@ -75,7 +75,6 @@ public class CacheContainersTestCase {
     public static void beforeClass() throws IOException, TimeoutException, InterruptedException {
         ops.add(CACHE_CONTAINER_TBR_ADDRESS).assertSuccess();
         ops.add(CACHE_CONTAINER_ADDRESS).assertSuccess();
-        ops.headers(Values.of("allow-resource-service-restart", true)).add(TRANSPORT_ADDRESS).assertSuccess();
         ops.add(LOCAL_CACHE_ADDRESS).assertSuccess();
         adminOps.reloadIfRequired();
     }
@@ -111,6 +110,7 @@ public class CacheContainersTestCase {
         new ResourceVerifier(CACHE_CONTAINER_TBR_ADDRESS, client).verifyDoesNotExist();
     }
 
+    @Ignore("No longer needed")
     @Test
     public void editJndiName() throws Exception {
         String attributeName = "jndi-name";

@@ -35,8 +35,7 @@ public class EvictionTestCase extends InfinispanTestCaseAbstract {
         return new ParametersFactory(client).containerTypeMatrix();
     }
 
-
-    @Ignore //fails because of HAL-1393
+    @Ignore("Fails because of HAL-1393")
     @Test
     public void editEvictionTest() throws Exception {
         final long size = 1245678;

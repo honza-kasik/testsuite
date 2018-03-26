@@ -1,6 +1,7 @@
 package org.jboss.hal.testsuite.test.configuration.messaging.clustering;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.hal.testsuite.creaper.ManagementClientProvider;
@@ -24,13 +25,12 @@ import org.wildfly.extras.creaper.core.online.operations.Operations;
 import org.wildfly.extras.creaper.core.online.operations.Values;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static org.jboss.hal.testsuite.util.ConfigChecker.InputType.TEXT;
 
 @RunWith(Arquillian.class)
+@RunAsClient
 public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
 
     private static final String
@@ -38,7 +38,21 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
             INITIAL_WAIT_TIMEOUT = "initial-wait-timeout",
             JGROUPS_CHANNEL = "jgroups-channel",
             DISCOVERY_GROUP = "discovery-group",
-            SOCKET_BINDING = "socket-binding";
+            SOCKET_BINDING = "socket-binding",
+            JGROUPS_CLUSTER = "jgroups-cluster";
+
+
+    private static final String SOCKET_BINDING_WITH_ADDED_DISCOVERY_GROUP =
+            "socket_binding_with_added_discovery_group_" + RandomStringUtils.randomAlphanumeric(7);
+
+    private static final String SOCKET_BINDING_WITH_UPDATED_DISCOVERY_GROUP =
+            "socket_binding_with_updated_discovery_group_" + RandomStringUtils.randomAlphanumeric(7);
+
+    private static final String SOCKET_BINDING_DISCOVERY_GROUP_INITIAL_TIMEOUT =
+            "socket_binding_discovery_group_initial_timeout" + RandomStringUtils.randomAlphanumeric(7);
+
+    private static final String SOCKET_BINDING_DISCOVERY_GROUP_REFRESH_TIMEOUT =
+            "socket_binding_discovery_group_refresh_timeout" + RandomStringUtils.randomAlphanumeric(7);
 
     private static final Address DG_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
             "dg-group_" + RandomStringUtils.randomAlphabetic(7));
@@ -51,8 +65,6 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
     private static final Address DG_INV_ADDRESS = DEFAULT_MESSAGING_SERVER.and(DISCOVERY_GROUP,
             "dg-group_INV_" + RandomStringUtils.randomAlphanumeric(5));
 
-    private static final List<String> socketBindings = new LinkedList<>();
-
     private static final OnlineManagementClient discoveryGroupClient =  ConfigUtils.isDomain() ?
             ManagementClientProvider.withProfile("full-ha") :
             client;
@@ -60,8 +72,10 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
 
     @BeforeClass
     public static void setUp() throws Exception {
-        socketBindings.add(createSocketBinding());
-        socketBindings.add(createSocketBinding());
+        createSocketBinding(SOCKET_BINDING_WITH_ADDED_DISCOVERY_GROUP);
+        createSocketBinding(SOCKET_BINDING_WITH_UPDATED_DISCOVERY_GROUP);
+        createSocketBinding(SOCKET_BINDING_DISCOVERY_GROUP_INITIAL_TIMEOUT);
+        createSocketBinding(SOCKET_BINDING_DISCOVERY_GROUP_REFRESH_TIMEOUT);
         discoveryGroupOps.add(DG_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
         discoveryGroupOps.add(DG_TBR_ADDRESS, Values.of(JGROUPS_CHANNEL, "ee")).assertSuccess();
         administration.reloadIfRequired();
@@ -95,7 +109,7 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
     public void addDiscoveryGroupWithSocketBindingDefined() throws Exception {
         page.addDiscoveryGroup()
                 .name(DG_TBA_ADDRESS.getLastPairValue())
-                .socketBinding(socketBindings.get(0))
+                .socketBinding(SOCKET_BINDING_WITH_ADDED_DISCOVERY_GROUP)
                 .saveAndDismissReloadRequiredWindowWithState()
                 .assertWindowClosed();
 
@@ -110,6 +124,7 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
         page.addDiscoveryGroup()
                 .name(DG_TBA2_ADDRESS.getLastPairValue())
                 .jgroupsChannel("ee")
+                .jgroupsCluster("random_cluster_" + RandomStringUtils.randomAlphanumeric(7))
                 .saveAndDismissReloadRequiredWindowWithState()
                 .assertWindowClosed();
 
@@ -135,7 +150,7 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
     @Ignore("Ignored until https://issues.jboss.org/browse/WFLY-6607 is resolved")
     @Test
     public void updateDiscoveryGroupSocketBinding() throws Exception {
-        editTextAndVerify(DG_ADDRESS, SOCKET_BINDING, socketBindings.get(1));
+        editTextAndVerify(DG_ADDRESS, SOCKET_BINDING, SOCKET_BINDING_WITH_UPDATED_DISCOVERY_GROUP);
     }
 
     @Test
@@ -143,7 +158,9 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
         final long value = 2000;
         new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
                 .configFragment(page.getConfigFragment())
-                .editAndSave(TEXT, REFRESH_TIMEOUT, String.valueOf(value))
+                .edit(TEXT, REFRESH_TIMEOUT, String.valueOf(value))
+                .edit(TEXT, JGROUPS_CLUSTER, "")
+                .editAndSave(TEXT, SOCKET_BINDING, SOCKET_BINDING_DISCOVERY_GROUP_REFRESH_TIMEOUT)
                 .verifyFormSaved()
                 .verifyAttribute(REFRESH_TIMEOUT, value);
     }
@@ -161,7 +178,9 @@ public class DiscoveryGroupsTestCase extends AbstractMessagingTestCase {
         final long value = 200;
         new ConfigChecker.Builder(discoveryGroupClient, DG_ADDRESS)
                 .configFragment(page.getConfigFragment())
-                .editAndSave(TEXT, INITIAL_WAIT_TIMEOUT, String.valueOf(value))
+                .edit(TEXT, INITIAL_WAIT_TIMEOUT, String.valueOf(value))
+                .edit(TEXT, JGROUPS_CLUSTER, "")
+                .editAndSave(TEXT, SOCKET_BINDING, SOCKET_BINDING_DISCOVERY_GROUP_INITIAL_TIMEOUT)
                 .verifyFormSaved()
                 .verifyAttribute(INITIAL_WAIT_TIMEOUT, value);
     }
